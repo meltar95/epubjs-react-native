@@ -9,7 +9,7 @@ import { defaultTheme as initialTheme, ReaderContext } from './context';
 import type { Bookmark, ReaderProps } from './types';
 import { OpeningBook } from './utils/OpeningBook';
 import INTERNAL_EVENTS from './utils/internalEvents.util';
-import { GestureHandler } from './utils/GestureHandler';
+import { AnimatedPageTurner } from './utils/AnimatedPageTurner';
 
 export type ViewProps = Omit<ReaderProps, 'src' | 'fileSystem'> & {
   templateUri: string;
@@ -408,7 +408,7 @@ export function View({
   }, [registerBook]);
 
   return (
-    <GestureHandler
+    <AnimatedPageTurner
       width={width}
       height={height}
       onSingleTap={() => {
@@ -492,6 +492,6 @@ export function View({
           height,
         }}
       />
-    </GestureHandler>
+    </AnimatedPageTurner>
   );
 }

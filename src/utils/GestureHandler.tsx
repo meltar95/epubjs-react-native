@@ -1,35 +1,23 @@
-import React, { useRef } from 'react';
-import {
-  Animated,
-  DimensionValue,
-  I18nManager,
-  Platform,
-  View,
-  Easing,
-} from 'react-native';
+import React from 'react';
+import { DimensionValue, I18nManager, Platform, View } from 'react-native';
 import {
   GestureHandlerRootView,
   GestureDetector,
   Gesture,
   Directions,
   TouchableWithoutFeedback,
-  GestureStateChangeEvent,
-  LongPressGestureHandlerEventPayload,
-  TapGesture,
-  FlingGesture,
-  LongPressGesture,
 } from 'react-native-gesture-handler';
 
 interface Props {
   width?: DimensionValue;
   height?: DimensionValue;
-  onSingleTap?: () => void;
-  onDoubleTap?: () => void;
-  onSwipeLeft?: () => void;
-  onSwipeRight?: () => void;
-  onSwipeUp?: () => void;
-  onSwipeDown?: () => void;
-  onLongPress?: () => void;
+  onSingleTap: () => void;
+  onDoubleTap: () => void;
+  onSwipeLeft: () => void;
+  onSwipeRight: () => void;
+  onSwipeUp: () => void;
+  onSwipeDown: () => void;
+  onLongPress: () => void;
   children: React.ReactNode;
 }
 
@@ -45,91 +33,76 @@ export function GestureHandler({
   onLongPress,
   children,
 }: Props) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const rotateY = useRef(new Animated.Value(0)).current;
+  const singleTap = Gesture.Tap().maxDuration(250).onStart(onSingleTap);
 
-  const handleSwipe = (direction: 'left' | 'right') => {
-    const toValue = direction === 'left' ? -300 : 300;
-    const rotateTo = direction === 'left' ? 180 : -180;
-
-    Animated.parallel([
-      Animated.timing(translateX, {
-        toValue,
-        duration: 300,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.timing(rotateY, {
-        toValue: rotateTo,
-        duration: 300,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      translateX.setValue(0);
-      rotateY.setValue(0);
-      direction === 'left' ? onSwipeLeft?.() : onSwipeRight?.();
-    });
-  };
-
-  const singleTap: TapGesture = Gesture.Tap()
-    .maxDuration(250)
-    .onStart(() => onSingleTap?.());
-
-  const doubleTap: TapGesture = Gesture.Tap()
+  const doubleTap = Gesture.Tap()
     .maxDuration(250)
     .numberOfTaps(2)
-    .onStart(() => onDoubleTap?.());
+    .onStart(onDoubleTap);
 
-  const longPress: LongPressGesture = Gesture.LongPress().onStart(
-    (event: GestureStateChangeEvent<LongPressGestureHandlerEventPayload>) =>
-      onLongPress?.()
-  );
+  const longPress = Gesture.LongPress().onStart(onLongPress);
 
-  const swipeLeft: FlingGesture = Gesture.Fling()
+  const swipeLeft = Gesture.Fling()
     .direction(I18nManager.isRTL ? Directions.RIGHT : Directions.LEFT)
-    .onStart(() => handleSwipe('left'));
+    .onStart(onSwipeLeft);
 
-  const swipeRight: FlingGesture = Gesture.Fling()
+  const swipeRight = Gesture.Fling()
     .direction(I18nManager.isRTL ? Directions.LEFT : Directions.RIGHT)
-    .onStart(() => handleSwipe('right'));
+    .onStart(onSwipeRight);
 
-  const swipeUp = onSwipeUp
-    ? Gesture.Fling().direction(Directions.UP).onStart(() => onSwipeUp?.())
-    : null;
+  const swipeUp = Gesture.Fling().direction(Directions.UP).onStart(onSwipeUp);
 
-  const swipeDown = onSwipeDown
-    ? Gesture.Fling().direction(Directions.DOWN).onStart(() => onSwipeDown?.())
-    : null;
+  const swipeDown = Gesture.Fling()
+    .direction(Directions.DOWN)
+    .onStart(onSwipeDown);
 
-  const gestures: Array<TapGesture | FlingGesture | LongPressGesture> = [
-    swipeLeft,
-    swipeRight,
-    swipeUp,
-    swipeDown,
-    longPress,
-    doubleTap,
-    singleTap,
-  ].filter(Boolean) as Array<TapGesture | FlingGesture | LongPressGesture>;
+  let lastTap: number | null = null;
+  let timer: NodeJS.Timeout;
 
-  const animatedStyle = {
-    transform: [
-      { translateX },
-      {
-        rotateY: rotateY.interpolate({
-          inputRange: [-180, 0, 180],
-          outputRange: ['-180deg', '0deg', '180deg'],
-        }),
-      },
-    ],
+  const handleDoubleTap = () => {
+    if (lastTap) {
+      onDoubleTap();
+      clearTimeout(timer);
+      lastTap = null;
+    } else {
+      lastTap = Date.now();
+      timer = setTimeout(() => {
+        onSingleTap();
+        lastTap = null;
+        clearTimeout(timer);
+      }, 500);
+    }
   };
 
+  if (Platform.OS === 'ios') {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureDetector
+          gesture={Gesture.Exclusive(
+            swipeLeft,
+            swipeRight,
+            swipeUp,
+            swipeDown,
+            longPress,
+            doubleTap,
+            singleTap
+          )}
+        >
+          <TouchableWithoutFeedback
+            style={{ width, height }}
+            onPress={() => Platform.OS === 'ios' && handleDoubleTap()}
+            onLongPress={() => Platform.OS === 'ios' && onLongPress()}
+          >
+            {children}
+          </TouchableWithoutFeedback>
+        </GestureDetector>
+      </GestureHandlerRootView>
+    );
+  }
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <GestureDetector gesture={Gesture.Exclusive(...gestures)}>
-        <Animated.View style={[{ width, height }, animatedStyle]}>
-          <TouchableWithoutFeedback>{children}</TouchableWithoutFeedback>
-        </Animated.View>
+      <GestureDetector gesture={Gesture.Exclusive(swipeLeft, swipeRight)}>
+        <View style={{ width, height }}>{children}</View>
       </GestureDetector>
     </GestureHandlerRootView>
   );
